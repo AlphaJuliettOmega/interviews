@@ -18,34 +18,19 @@ class ProductController {
      * @param $name
      * @return
      */
-    public function getById_GET(Application $app, $id){
-        $curl = curl_init();
-        $requestData = array();
-        $requestData['id'] = $id;
-        curl_setopt($curl, CURLOPT_URL,  'http://192.168.0.241/eanlist?type=Web');
-        curl_setopt($curl, CURLOPT_POST, 1);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $requestData);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        $response = curl_exec($curl);
-        $response = json_decode($response);
-        curl_close($curl);
-        $result = [];
-        for ($i =0; $i < count($response) ;$i++) {
-            $prod = array();
-            $prod['ean'] =$response[$i]['barcode'];
-            $prod["name"]=$response[$i]['itemName'];
-            $prod["prices"] = array();
-            for ($j=0;$j < count($response[$i]['prices']); $j++) {
-                if ($response[$i]['prices'][$j]['currencyCode'] != 'ZAR') {
-                    $p_price = array();
-                    $p_price['price'] = $response[$i]['prices'][$j]['sellingPrice'];
-                    $p_price['curreny'] = $response[$i]['prices'][$j]['currencyCode'];
-                    $prod["prices"][] = $p_price;
-                }
-            }
-            $result[] = $prod;
-        }
-
+    public function GET_ProductById(Application $app, $id) {
+        $options = [
+            CURLOPT_URL => 'http://192.168.0.241/eanlist?type=Web',
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => ['id' => $id],
+            CURLOPT_RETURNTRANSFER => 1
+        ];
+        $response = requestData($options);        
+        /*TODO Important note, bug in old code:
+        currency != curreny, 
+        old api had spelling error and returned it in response, 
+        has to be changed for consistency on API that uses this function. */ 
+        $result = processPrices($result, $response);
         return $app->render('products/product.detail.twig', $result);
     }
 
@@ -57,35 +42,45 @@ class ProductController {
      * @param $name
      * @return
      */
-    public function getByName_GET(Application $app, $name){
-        $curl = curl_init();
-        $requestData = array();
-        $requestData['names'] = $name;
-        curl_setopt($curl, CURLOPT_URL,  'http://192.168.0.241/eanlist?type=Web');
-        curl_setopt($curl, CURLOPT_POST, 1);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $requestData);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        $response = curl_exec($curl);
-        $response = json_decode($response);
-        curl_close($curl);
+    public function GET_ProductByName(Application $app, $name){
+        $options = [
+            CURLOPT_URL => 'http://192.168.0.241/eanlist?type=Web',
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => ['names' => $name],
+            CURLOPT_RETURNTRANSFER => 1
+        ];
+        $response = requestData($options);
+        $result = processPrices($response);
+        return $app->render('products/products.twig', $result);
+    }
+
+    private function processPrices($priceList) {
         $result = [];
-        for ($i =0; $i < count($response) ;$i++) {
-            $prod = array();
-            $prod['ean'] = $response[$i]['barcode'];
-            $prod["name"]= $response[$i]['itemName'];
-            $prod["prices"] = array();
-            for ($j=0;$j < count($response[$i]['prices']); $j++) {
-                if ($response[$i]['prices'][$j]['currencyCode'] != 'ZAR') {
-                    $p_price = array();
-                    $p_price['price'] = $response[$i]['prices'][$j]['sellingPrice'];
-                    $p_price['currency'] = $response[$i]['prices'][$j]['currencyCode'];
-                    $prod["prices"][] = $p_price;
+        foreach ($response as $responseLine) {
+            $prod = [];
+            $prod['ean'] = $responseLine['barcode'];
+            $prod['name'] = $responseLine['itemName'];
+            $prod['prices'] = array();
+            
+            foreach ($responseLine['prices'] as $price) {
+                if ($price['currencyCode'] != 'ZAR') {
+                    $prod['prices'][] = [
+                        'price' => $price['sellingPrice'],
+                        'curreny' => $price['currencyCode']
+                    ];
                 }
             }
             $result[] = $prod;
         }
-
-        return $app->render('products/products.twig', $result);
+        return $result;
     }
 
+    private function requestData($curlOptions) {
+        $curl = curl_init();        
+        curl_setopt_array($curl, $options);
+        $response = curl_exec($curl);
+        $response = json_decode($response);
+        curl_close($curl);
+        return $response;
+    }
 }
