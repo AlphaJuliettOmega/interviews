@@ -25,11 +25,13 @@ class ProductController {
             CURLOPT_POSTFIELDS => ['id' => $id],
             CURLOPT_RETURNTRANSFER => 1
         ];
-        $response = requestData($options);        
-        /*TODO Important note, bug in old code:
+        $response = requestData($options);
+        /*TODO Important note, to be removed when fixed downstream.
+        bug in old code:
         currency != curreny, 
-        old api had spelling error and returned it in response, 
-        has to be changed for consistency on API that uses this function. */ 
+        old api had spelling error and returned it in response,
+        has to be changed for consistency on API that uses this function.
+        probably just ctrl h replace curreny to currency in product.detail.twig */
         $result = processPrices($result, $response);
         return $app->render('products/product.detail.twig', $result);
     }
@@ -60,8 +62,7 @@ class ProductController {
             $prod = [];
             $prod['ean'] = $responseLine['barcode'];
             $prod['name'] = $responseLine['itemName'];
-            $prod['prices'] = array();
-            
+            $prod['prices'] = [];
             foreach ($responseLine['prices'] as $price) {
                 if ($price['currencyCode'] != 'ZAR') {
                     $prod['prices'][] = [
@@ -76,7 +77,7 @@ class ProductController {
     }
 
     private function requestData($curlOptions) {
-        $curl = curl_init();        
+        $curl = curl_init();
         curl_setopt_array($curl, $options);
         $response = curl_exec($curl);
         $response = json_decode($response);
